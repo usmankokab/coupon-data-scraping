@@ -16,6 +16,7 @@ import re
 import pyperclip
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlparse
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -29,6 +30,7 @@ class TravelokaCodeScraper:
         self.coupons = []
         self.offers = []
         self.driver = None
+        self.current_url = None
         
     def setup_driver(self):
         """Setup Chrome driver - headless mode"""
@@ -54,7 +56,10 @@ class TravelokaCodeScraper:
             if not self.setup_driver():
                 return False
             
-            url = "https://www.cuponation.com.sg/traveloka-promo-code"
+            #url = "https://www.cuponation.com.sg/traveloka-promo-code"
+            url = "https://www.cuponation.com.sg/singapore-zoo-coupon"
+            
+            self.current_url = url
             print(f"Loading {url}...")
             self.driver.get(url)
             
@@ -363,15 +368,30 @@ class TravelokaCodeScraper:
             writer.writerows(self.offers)
         print("   offers.csv")
         
-        # Save combined text report
-        txt = "TRAVELOKA OFFERS (GET DEAL - No Code Required)\n"
+        # Save combined text report - to Working Reports folder (outside project)
+        # Extract brand name from URL (e.g., https://www.cuponation.com.sg/traveloka-promo-code -> TRAVELOKA)
+        parsed_url = urlparse(self.current_url)
+        path = parsed_url.path.strip('/')
+        filename = path if path else 'report'
+        
+        # Extract brand name - remove common suffixes like -promo-code, -coupon, etc.
+        brand_name = path
+        # Remove common suffixes
+        for suffix in ['-promo-code', '-coupon', '-deal', '-offer', 'promo-code', 'coupon', 'deal', 'offer']:
+            brand_name = brand_name.replace(suffix, '')
+        # Replace hyphens with spaces and convert to uppercase
+        brand_name = brand_name.replace('-', ' ').strip().upper()
+        if not brand_name:
+            brand_name = 'BRAND'
+        
+        txt = f"{brand_name} OFFERS (GET DEAL - No Code Required)\n"
         txt += "="*60 + "\n\n"
         
         for o in self.offers:
             txt += f"Title: {o.get('title', 'N/A')}\n\n"
         
         txt += "\n" + "="*60 + "\n"
-        txt += "TRAVELOKA COUPONS (SEE PROMO CODE - Code Required)\n"
+        txt += f"{brand_name} COUPONS (SEE PROMO CODE - Code Required)\n"
         txt += "="*60 + "\n\n"
         
         for c in simplified_coupons:
@@ -380,6 +400,22 @@ class TravelokaCodeScraper:
             txt += f"Expires: {c['Expires']}\n\n"
         
         txt += "="*60 + "\n"
+        
+        # Extract filename from URL (e.g., https://www.cuponation.com.sg/traveloka-promo-code -> traveloka-promo-code)
+        parsed_url = urlparse(self.current_url)
+        path = parsed_url.path.strip('/')
+        filename = path if path else 'report'
+        
+        # Create Working Reports folder outside the project
+        working_reports_dir = Path('d:/07-Data Extraction/Working Reports')
+        working_reports_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Save to Working Reports folder (overwrites if same URL)
+        txt_file = working_reports_dir / f'{filename}.txt'
+        txt_file.write_text(txt, encoding='utf-8')
+        print(f"   Working Reports/{filename}.txt")
+        
+        # Also save to output folder (old behavior)
         (p / 'traveloka_coupons.txt').write_text(txt, encoding='utf-8')
         print("   traveloka_coupons.txt")
         

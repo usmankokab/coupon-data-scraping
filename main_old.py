@@ -38,6 +38,7 @@ class TravelokaScraper:
         self.setup_session()
         self.coupons = []
         self.offers = []
+        self.current_url = None
         
     def setup_session(self):
         """Configure session to mimic real browser"""
@@ -184,9 +185,19 @@ class TravelokaScraper:
                 unique_offers.append(o)
         self.offers = unique_offers
     
-    def _save_as_txt(self, output_dir):
+    def _save_as_txt(self, output_dir, url):
         """Save results as human-readable text file"""
-        txt_file = output_dir / 'traveloka_coupons.txt'
+        # Extract filename from URL (e.g., https://www.cuponation.com.sg/traveloka-promo-code -> traveloka-promo-code)
+        from urllib.parse import urlparse
+        parsed_url = urlparse(url)
+        path = parsed_url.path.strip('/')
+        filename = path if path else 'report'
+        
+        # Create Working Reports folder outside the project
+        working_reports_dir = Path('d:/07-Data Extraction/Working Reports')
+        working_reports_dir.mkdir(parents=True, exist_ok=True)
+        
+        txt_file = working_reports_dir / f'{filename}.txt'
         
         with open(txt_file, 'w', encoding='utf-8') as f:
             # Header
@@ -232,9 +243,9 @@ class TravelokaScraper:
             f.write('END OF REPORT\n')
             f.write('='*80 + '\n')
         
-        print(f"   ✅ output/traveloka_coupons.txt")
+        print(f"   ✅ Working Reports/{filename}.txt")
     
-    def save_results(self):
+    def save_results(self, url):
         """Save to JSON, CSV, and TXT formats"""
         output = Path('output')
         output.mkdir(exist_ok=True)
@@ -276,11 +287,12 @@ class TravelokaScraper:
         print(f"   ✅ output/coupons.csv")
         
         # Save as TXT (human-readable format)
-        self._save_as_txt(output)
+        self._save_as_txt(output, url)
     
-    def run(self):
+    def run(self, url=None):
         """Execute the scraper"""
-        url = 'https://www.cuponation.com.sg/traveloka-promo-code'
+        if url is None:
+            url = 'https://www.cuponation.com.sg/traveloka-promo-code'
         html = self.fetch_page(url)
         
         if not html:
@@ -289,7 +301,8 @@ class TravelokaScraper:
         self.parse_items(html)
         
         if self.coupons or self.offers:
-            self.save_results()
+            self.current_url = url
+            self.save_results(url)
             return True
         
         print("⚠️  No data extracted")
